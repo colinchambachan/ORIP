@@ -1,0 +1,19 @@
+{
+  "mode": "spin",
+  "queue_cap": 8,
+  "queue_full_hits": 171238233,
+  "pending_writes": 0,
+  "pending_drains": 0,
+  "pending_inserts": 0,
+  "pending_overwrites": 0,
+  "applied_from_queue": 300000,
+  "applied_from_pending": 0,
+  "applied_total": 300000,
+  "elapsed_s": 19.7577,
+  "events_per_sec": 15184,
+  "lines": 300000,
+  "parsed": 300000,
+  "bad": 0,
+  "symbols": 2,
+  "final_state_out": "out/experiments/spin_q8_overload.csv"
+}

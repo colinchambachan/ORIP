@@ -1,0 +1,19 @@
+{
+  "mode": "coalesce",
+  "queue_cap": 1024,
+  "queue_full_hits": 292555,
+  "pending_writes": 292555,
+  "pending_drains": 2,
+  "pending_inserts": 2,
+  "pending_overwrites": 292553,
+  "applied_from_queue": 7445,
+  "applied_from_pending": 2,
+  "applied_total": 7447,
+  "elapsed_s": 0.492383,
+  "events_per_sec": 609281,
+  "lines": 300000,
+  "parsed": 300000,
+  "bad": 0,
+  "symbols": 2,
+  "final_state_out": "out/experiments/coalesce_q1024_overload.csv"
+}

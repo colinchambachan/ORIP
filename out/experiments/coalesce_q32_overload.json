@@ -1,0 +1,19 @@
+{
+  "mode": "coalesce",
+  "queue_cap": 32,
+  "queue_full_hits": 293548,
+  "pending_writes": 293548,
+  "pending_drains": 2,
+  "pending_inserts": 2,
+  "pending_overwrites": 293546,
+  "applied_from_queue": 6452,
+  "applied_from_pending": 2,
+  "applied_total": 6454,
+  "elapsed_s": 0.425869,
+  "events_per_sec": 704442,
+  "lines": 300000,
+  "parsed": 300000,
+  "bad": 0,
+  "symbols": 2,
+  "final_state_out": "out/experiments/coalesce_q32_overload.csv"
+}

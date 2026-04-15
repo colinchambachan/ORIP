@@ -1,0 +1,19 @@
+{
+  "mode": "coalesce",
+  "queue_cap": 8,
+  "queue_full_hits": 293017,
+  "pending_writes": 293017,
+  "pending_drains": 18,
+  "pending_inserts": 18,
+  "pending_overwrites": 292999,
+  "applied_from_queue": 6983,
+  "applied_from_pending": 18,
+  "applied_total": 7001,
+  "elapsed_s": 0.609697,
+  "events_per_sec": 492048,
+  "lines": 300000,
+  "parsed": 300000,
+  "bad": 0,
+  "symbols": 2,
+  "final_state_out": "out/experiments/coalesce_q8_overload.csv"
+}
