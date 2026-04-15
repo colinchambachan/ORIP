@@ -1,0 +1,722 @@
+{
+  "q8": {
+    "spin_csv": "out/experiments/spin_q8.csv",
+    "coalesce_csv": "out/experiments/coalesce_q8.csv",
+    "symbol_sets_match": true,
+    "spin_symbol_count": 12,
+    "coalesce_symbol_count": 12,
+    "latest_state_match": true,
+    "count_match": false,
+    "full_row_match": false,
+    "mismatches": [
+      {
+        "symbol": "ADAUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "ADAUSDT",
+          "last_ts_ms": "1700000028507",
+          "last_price": "0.56383724999999996",
+          "last_qty": "1186.5408",
+          "count": "300"
+        },
+        "coalesce": {
+          "symbol": "ADAUSDT",
+          "last_ts_ms": "1700000028507",
+          "last_price": "0.56383724999999996",
+          "last_qty": "1186.5408",
+          "count": "6"
+        }
+      },
+      {
+        "symbol": "ARBUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "ARBUSDT",
+          "last_ts_ms": "1700000028774",
+          "last_price": "1.8433427099999999",
+          "last_qty": "214.64250000000001",
+          "count": "55"
+        },
+        "coalesce": {
+          "symbol": "ARBUSDT",
+          "last_ts_ms": "1700000028774",
+          "last_price": "1.8433427099999999",
+          "last_qty": "214.64250000000001",
+          "count": "2"
+        }
+      },
+      {
+        "symbol": "AVAXUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "AVAXUSDT",
+          "last_ts_ms": "1700000028555",
+          "last_price": "42.641017009999999",
+          "last_qty": "17.6435",
+          "count": "49"
+        },
+        "coalesce": {
+          "symbol": "AVAXUSDT",
+          "last_ts_ms": "1700000028555",
+          "last_price": "42.641017009999999",
+          "last_qty": "17.6435",
+          "count": "1"
+        }
+      },
+      {
+        "symbol": "BNBUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "BNBUSDT",
+          "last_ts_ms": "1700000028747",
+          "last_price": "571.32107321000001",
+          "last_qty": "2.012",
+          "count": "289"
+        },
+        "coalesce": {
+          "symbol": "BNBUSDT",
+          "last_ts_ms": "1700000028747",
+          "last_price": "571.32107321000001",
+          "last_qty": "2.012",
+          "count": "7"
+        }
+      },
+      {
+        "symbol": "BTCUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "BTCUSDT",
+          "last_ts_ms": "1700000028799",
+          "last_price": "67029.523912649995",
+          "last_qty": "0.0073000000000000001",
+          "count": "3528"
+        },
+        "coalesce": {
+          "symbol": "BTCUSDT",
+          "last_ts_ms": "1700000028799",
+          "last_price": "67029.523912649995",
+          "last_qty": "0.0073000000000000001",
+          "count": "68"
+        }
+      },
+      {
+        "symbol": "DOGEUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "DOGEUSDT",
+          "last_ts_ms": "1700000028741",
+          "last_price": "0.13877264",
+          "last_qty": "275.82810000000001",
+          "count": "327"
+        },
+        "coalesce": {
+          "symbol": "DOGEUSDT",
+          "last_ts_ms": "1700000028741",
+          "last_price": "0.13877264",
+          "last_qty": "275.82810000000001",
+          "count": "8"
+        }
+      },
+      {
+        "symbol": "ETHUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "ETHUSDT",
+          "last_ts_ms": "1700000028717",
+          "last_price": "5642.1426499299996",
+          "last_qty": "0.1653",
+          "count": "3509"
+        },
+        "coalesce": {
+          "symbol": "ETHUSDT",
+          "last_ts_ms": "1700000028717",
+          "last_price": "5642.1426499299996",
+          "last_qty": "0.1653",
+          "count": "50"
+        }
+      },
+      {
+        "symbol": "LINKUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "LINKUSDT",
+          "last_ts_ms": "1700000028777",
+          "last_price": "18.242255409999999",
+          "last_qty": "24.995000000000001",
+          "count": "48"
+        },
+        "coalesce": {
+          "symbol": "LINKUSDT",
+          "last_ts_ms": "1700000028777",
+          "last_price": "18.242255409999999",
+          "last_qty": "24.995000000000001",
+          "count": "2"
+        }
+      },
+      {
+        "symbol": "LTCUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "LTCUSDT",
+          "last_ts_ms": "1700000028608",
+          "last_price": "73.687352099999998",
+          "last_qty": "3.7502",
+          "count": "41"
+        },
+        "coalesce": {
+          "symbol": "LTCUSDT",
+          "last_ts_ms": "1700000028608",
+          "last_price": "73.687352099999998",
+          "last_qty": "3.7502",
+          "count": "2"
+        }
+      },
+      {
+        "symbol": "MATICUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "MATICUSDT",
+          "last_ts_ms": "1700000028529",
+          "last_price": "0.96145347000000003",
+          "last_qty": "569.01440000000002",
+          "count": "53"
+        },
+        "coalesce": {
+          "symbol": "MATICUSDT",
+          "last_ts_ms": "1700000028529",
+          "last_price": "0.96145347000000003",
+          "last_qty": "569.01440000000002",
+          "count": "2"
+        }
+      },
+      {
+        "symbol": "SOLUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "SOLUSDT",
+          "last_ts_ms": "1700000028802",
+          "last_price": "296.81242485000001",
+          "last_qty": "12.023099999999999",
+          "count": "3532"
+        },
+        "coalesce": {
+          "symbol": "SOLUSDT",
+          "last_ts_ms": "1700000028802",
+          "last_price": "296.81242485000001",
+          "last_qty": "12.023099999999999",
+          "count": "47"
+        }
+      },
+      {
+        "symbol": "XRPUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "XRPUSDT",
+          "last_ts_ms": "1700000028754",
+          "last_price": "0.62470798999999999",
+          "last_qty": "1322.6954000000001",
+          "count": "269"
+        },
+        "coalesce": {
+          "symbol": "XRPUSDT",
+          "last_ts_ms": "1700000028754",
+          "last_price": "0.62470798999999999",
+          "last_qty": "1322.6954000000001",
+          "count": "5"
+        }
+      }
+    ]
+  },
+  "q32": {
+    "spin_csv": "out/experiments/spin_q32.csv",
+    "coalesce_csv": "out/experiments/coalesce_q32.csv",
+    "symbol_sets_match": true,
+    "spin_symbol_count": 12,
+    "coalesce_symbol_count": 12,
+    "latest_state_match": true,
+    "count_match": false,
+    "full_row_match": false,
+    "mismatches": [
+      {
+        "symbol": "ADAUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "ADAUSDT",
+          "last_ts_ms": "1700000028507",
+          "last_price": "0.56383724999999996",
+          "last_qty": "1186.5408",
+          "count": "300"
+        },
+        "coalesce": {
+          "symbol": "ADAUSDT",
+          "last_ts_ms": "1700000028507",
+          "last_price": "0.56383724999999996",
+          "last_qty": "1186.5408",
+          "count": "4"
+        }
+      },
+      {
+        "symbol": "ARBUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "ARBUSDT",
+          "last_ts_ms": "1700000028774",
+          "last_price": "1.8433427099999999",
+          "last_qty": "214.64250000000001",
+          "count": "55"
+        },
+        "coalesce": {
+          "symbol": "ARBUSDT",
+          "last_ts_ms": "1700000028774",
+          "last_price": "1.8433427099999999",
+          "last_qty": "214.64250000000001",
+          "count": "1"
+        }
+      },
+      {
+        "symbol": "AVAXUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "AVAXUSDT",
+          "last_ts_ms": "1700000028555",
+          "last_price": "42.641017009999999",
+          "last_qty": "17.6435",
+          "count": "49"
+        },
+        "coalesce": {
+          "symbol": "AVAXUSDT",
+          "last_ts_ms": "1700000028555",
+          "last_price": "42.641017009999999",
+          "last_qty": "17.6435",
+          "count": "2"
+        }
+      },
+      {
+        "symbol": "BNBUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "BNBUSDT",
+          "last_ts_ms": "1700000028747",
+          "last_price": "571.32107321000001",
+          "last_qty": "2.012",
+          "count": "289"
+        },
+        "coalesce": {
+          "symbol": "BNBUSDT",
+          "last_ts_ms": "1700000028747",
+          "last_price": "571.32107321000001",
+          "last_qty": "2.012",
+          "count": "5"
+        }
+      },
+      {
+        "symbol": "BTCUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "BTCUSDT",
+          "last_ts_ms": "1700000028799",
+          "last_price": "67029.523912649995",
+          "last_qty": "0.0073000000000000001",
+          "count": "3528"
+        },
+        "coalesce": {
+          "symbol": "BTCUSDT",
+          "last_ts_ms": "1700000028799",
+          "last_price": "67029.523912649995",
+          "last_qty": "0.0073000000000000001",
+          "count": "82"
+        }
+      },
+      {
+        "symbol": "DOGEUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "DOGEUSDT",
+          "last_ts_ms": "1700000028741",
+          "last_price": "0.13877264",
+          "last_qty": "275.82810000000001",
+          "count": "327"
+        },
+        "coalesce": {
+          "symbol": "DOGEUSDT",
+          "last_ts_ms": "1700000028741",
+          "last_price": "0.13877264",
+          "last_qty": "275.82810000000001",
+          "count": "6"
+        }
+      },
+      {
+        "symbol": "ETHUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "ETHUSDT",
+          "last_ts_ms": "1700000028717",
+          "last_price": "5642.1426499299996",
+          "last_qty": "0.1653",
+          "count": "3509"
+        },
+        "coalesce": {
+          "symbol": "ETHUSDT",
+          "last_ts_ms": "1700000028717",
+          "last_price": "5642.1426499299996",
+          "last_qty": "0.1653",
+          "count": "48"
+        }
+      },
+      {
+        "symbol": "LINKUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "LINKUSDT",
+          "last_ts_ms": "1700000028777",
+          "last_price": "18.242255409999999",
+          "last_qty": "24.995000000000001",
+          "count": "48"
+        },
+        "coalesce": {
+          "symbol": "LINKUSDT",
+          "last_ts_ms": "1700000028777",
+          "last_price": "18.242255409999999",
+          "last_qty": "24.995000000000001",
+          "count": "1"
+        }
+      },
+      {
+        "symbol": "LTCUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "LTCUSDT",
+          "last_ts_ms": "1700000028608",
+          "last_price": "73.687352099999998",
+          "last_qty": "3.7502",
+          "count": "41"
+        },
+        "coalesce": {
+          "symbol": "LTCUSDT",
+          "last_ts_ms": "1700000028608",
+          "last_price": "73.687352099999998",
+          "last_qty": "3.7502",
+          "count": "2"
+        }
+      },
+      {
+        "symbol": "MATICUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "MATICUSDT",
+          "last_ts_ms": "1700000028529",
+          "last_price": "0.96145347000000003",
+          "last_qty": "569.01440000000002",
+          "count": "53"
+        },
+        "coalesce": {
+          "symbol": "MATICUSDT",
+          "last_ts_ms": "1700000028529",
+          "last_price": "0.96145347000000003",
+          "last_qty": "569.01440000000002",
+          "count": "3"
+        }
+      },
+      {
+        "symbol": "SOLUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "SOLUSDT",
+          "last_ts_ms": "1700000028802",
+          "last_price": "296.81242485000001",
+          "last_qty": "12.023099999999999",
+          "count": "3532"
+        },
+        "coalesce": {
+          "symbol": "SOLUSDT",
+          "last_ts_ms": "1700000028802",
+          "last_price": "296.81242485000001",
+          "last_qty": "12.023099999999999",
+          "count": "54"
+        }
+      },
+      {
+        "symbol": "XRPUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "XRPUSDT",
+          "last_ts_ms": "1700000028754",
+          "last_price": "0.62470798999999999",
+          "last_qty": "1322.6954000000001",
+          "count": "269"
+        },
+        "coalesce": {
+          "symbol": "XRPUSDT",
+          "last_ts_ms": "1700000028754",
+          "last_price": "0.62470798999999999",
+          "last_qty": "1322.6954000000001",
+          "count": "7"
+        }
+      }
+    ]
+  },
+  "q1024": {
+    "spin_csv": "out/experiments/spin_q1024.csv",
+    "coalesce_csv": "out/experiments/coalesce_q1024.csv",
+    "symbol_sets_match": true,
+    "spin_symbol_count": 12,
+    "coalesce_symbol_count": 12,
+    "latest_state_match": true,
+    "count_match": false,
+    "full_row_match": false,
+    "mismatches": [
+      {
+        "symbol": "ADAUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "ADAUSDT",
+          "last_ts_ms": "1700000028507",
+          "last_price": "0.56383724999999996",
+          "last_qty": "1186.5408",
+          "count": "300"
+        },
+        "coalesce": {
+          "symbol": "ADAUSDT",
+          "last_ts_ms": "1700000028507",
+          "last_price": "0.56383724999999996",
+          "last_qty": "1186.5408",
+          "count": "33"
+        }
+      },
+      {
+        "symbol": "ARBUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "ARBUSDT",
+          "last_ts_ms": "1700000028774",
+          "last_price": "1.8433427099999999",
+          "last_qty": "214.64250000000001",
+          "count": "55"
+        },
+        "coalesce": {
+          "symbol": "ARBUSDT",
+          "last_ts_ms": "1700000028774",
+          "last_price": "1.8433427099999999",
+          "last_qty": "214.64250000000001",
+          "count": "3"
+        }
+      },
+      {
+        "symbol": "AVAXUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "AVAXUSDT",
+          "last_ts_ms": "1700000028555",
+          "last_price": "42.641017009999999",
+          "last_qty": "17.6435",
+          "count": "49"
+        },
+        "coalesce": {
+          "symbol": "AVAXUSDT",
+          "last_ts_ms": "1700000028555",
+          "last_price": "42.641017009999999",
+          "last_qty": "17.6435",
+          "count": "4"
+        }
+      },
+      {
+        "symbol": "BNBUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "BNBUSDT",
+          "last_ts_ms": "1700000028747",
+          "last_price": "571.32107321000001",
+          "last_qty": "2.012",
+          "count": "289"
+        },
+        "coalesce": {
+          "symbol": "BNBUSDT",
+          "last_ts_ms": "1700000028747",
+          "last_price": "571.32107321000001",
+          "last_qty": "2.012",
+          "count": "35"
+        }
+      },
+      {
+        "symbol": "BTCUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "BTCUSDT",
+          "last_ts_ms": "1700000028799",
+          "last_price": "67029.523912649995",
+          "last_qty": "0.0073000000000000001",
+          "count": "3528"
+        },
+        "coalesce": {
+          "symbol": "BTCUSDT",
+          "last_ts_ms": "1700000028799",
+          "last_price": "67029.523912649995",
+          "last_qty": "0.0073000000000000001",
+          "count": "387"
+        }
+      },
+      {
+        "symbol": "DOGEUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "DOGEUSDT",
+          "last_ts_ms": "1700000028741",
+          "last_price": "0.13877264",
+          "last_qty": "275.82810000000001",
+          "count": "327"
+        },
+        "coalesce": {
+          "symbol": "DOGEUSDT",
+          "last_ts_ms": "1700000028741",
+          "last_price": "0.13877264",
+          "last_qty": "275.82810000000001",
+          "count": "31"
+        }
+      },
+      {
+        "symbol": "ETHUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "ETHUSDT",
+          "last_ts_ms": "1700000028717",
+          "last_price": "5642.1426499299996",
+          "last_qty": "0.1653",
+          "count": "3509"
+        },
+        "coalesce": {
+          "symbol": "ETHUSDT",
+          "last_ts_ms": "1700000028717",
+          "last_price": "5642.1426499299996",
+          "last_qty": "0.1653",
+          "count": "364"
+        }
+      },
+      {
+        "symbol": "LINKUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "LINKUSDT",
+          "last_ts_ms": "1700000028777",
+          "last_price": "18.242255409999999",
+          "last_qty": "24.995000000000001",
+          "count": "48"
+        },
+        "coalesce": {
+          "symbol": "LINKUSDT",
+          "last_ts_ms": "1700000028777",
+          "last_price": "18.242255409999999",
+          "last_qty": "24.995000000000001",
+          "count": "9"
+        }
+      },
+      {
+        "symbol": "LTCUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "LTCUSDT",
+          "last_ts_ms": "1700000028608",
+          "last_price": "73.687352099999998",
+          "last_qty": "3.7502",
+          "count": "41"
+        },
+        "coalesce": {
+          "symbol": "LTCUSDT",
+          "last_ts_ms": "1700000028608",
+          "last_price": "73.687352099999998",
+          "last_qty": "3.7502",
+          "count": "9"
+        }
+      },
+      {
+        "symbol": "MATICUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "MATICUSDT",
+          "last_ts_ms": "1700000028529",
+          "last_price": "0.96145347000000003",
+          "last_qty": "569.01440000000002",
+          "count": "53"
+        },
+        "coalesce": {
+          "symbol": "MATICUSDT",
+          "last_ts_ms": "1700000028529",
+          "last_price": "0.96145347000000003",
+          "last_qty": "569.01440000000002",
+          "count": "5"
+        }
+      },
+      {
+        "symbol": "SOLUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "SOLUSDT",
+          "last_ts_ms": "1700000028802",
+          "last_price": "296.81242485000001",
+          "last_qty": "12.023099999999999",
+          "count": "3532"
+        },
+        "coalesce": {
+          "symbol": "SOLUSDT",
+          "last_ts_ms": "1700000028802",
+          "last_price": "296.81242485000001",
+          "last_qty": "12.023099999999999",
+          "count": "301"
+        }
+      },
+      {
+        "symbol": "XRPUSDT",
+        "latest_state_match": true,
+        "count_match": false,
+        "spin": {
+          "symbol": "XRPUSDT",
+          "last_ts_ms": "1700000028754",
+          "last_price": "0.62470798999999999",
+          "last_qty": "1322.6954000000001",
+          "count": "269"
+        },
+        "coalesce": {
+          "symbol": "XRPUSDT",
+          "last_ts_ms": "1700000028754",
+          "last_price": "0.62470798999999999",
+          "last_qty": "1322.6954000000001",
+          "count": "23"
+        }
+      }
+    ]
+  }
+}

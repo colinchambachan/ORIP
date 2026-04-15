@@ -192,6 +192,42 @@ Step 2 builds on the ingestion engine to support **distributed online learning**
 - Cross-machine deployment
 - Integration with external stream processors
 
+---
+
+## 15. Reproducible Experiment Data
+
+The replay trace used by the current overload experiments is generated locally with:
+
+`scripts/generate_trade_data.py`
+
+By default it writes:
+
+`data/trades.jsonl`
+
+Key parameters:
+
+- `--events`: total number of JSONL trade events to generate
+- `--burst-size`: approximate number of events per burst window
+- `--seed`: deterministic random seed
+
+The `seed` controls reproducibility. If you run the generator twice with the same:
+
+- `--seed`
+- `--events`
+- `--burst-size`
+
+you will get the same `data/trades.jsonl` contents. Changing the seed produces a different, but still reproducible, bursty trade trace.
+
+The experiment harness:
+
+`scripts/run_experiments.sh`
+
+regenerates `data/trades.jsonl`, runs spin/coalesce replay across queue capacities `8`, `32`, and `1024`, and writes comparison results to:
+
+- `out/experiments/*.csv`
+- `out/experiments/*.json`
+- `out/experiments/final_state_comparison.json`
+
 Repo design
 .
 ├── Makefile

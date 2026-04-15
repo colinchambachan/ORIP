@@ -2,44 +2,48 @@
 
 ### Spin vs Coalesce
 
-The first sweep in `out/experiments` was too light to show meaningful coalescing behavior, so the experiment was rerun under controlled overload across all queue capacities:
+The experiment now uses a generated but deterministic replay trace instead of the earlier 3-line smoke file.
 
-- `queue_cap = 8, 32, 1024`
+- trace generator: `scripts/generate_trade_data.py`
+- generated file: `data/trades.jsonl`
+- generation settings: `--events 12000 --burst-size 200 --seed 7`
+- symbol count: `12`
+- hot-symbol skew: `SOLUSDT=3532`, `BTCUSDT=3528`, `ETHUSDT=3509`
+- hot-symbol share: `10,569 / 12,000` events (`88.1%`)
+- experiment runner: `scripts/run_experiments.sh`
+- replay settings: `--loop 1`, `queue_cap = 8, 32, 1024`
 - consumer delay re-enabled with `std::this_thread::sleep_for(std::chrono::microseconds(50));`
-- `--loop 100000`
-- input file: `data/trades.jsonl` (3 events per loop, 300,000 parsed events total)
 
 The relevant artifacts are:
 
-- `out/experiments/spin_q8_overload.json`
-- `out/experiments/spin_q32_overload.json`
-- `out/experiments/spin_q1024_overload.json`
-- `out/experiments/coalesce_q8_overload.json`
-- `out/experiments/coalesce_q32_overload.json`
-- `out/experiments/coalesce_q1024_overload.json`
-- `out/experiments/spin_q8_overload.csv`
-- `out/experiments/spin_q32_overload.csv`
-- `out/experiments/spin_q1024_overload.csv`
-- `out/experiments/coalesce_q8_overload.csv`
-- `out/experiments/coalesce_q32_overload.csv`
-- `out/experiments/coalesce_q1024_overload.csv`
+- `out/experiments/spin_q8.json`
+- `out/experiments/spin_q32.json`
+- `out/experiments/spin_q1024.json`
+- `out/experiments/coalesce_q8.json`
+- `out/experiments/coalesce_q32.json`
+- `out/experiments/coalesce_q1024.json`
+- `out/experiments/final_state_comparison.json`
+
+Older two-symbol overload artifacts from the earlier synthetic stress run were moved to `out/experiments/archive/` so they do not get confused with the current dataset-backed evaluation.
 
 | Mode | Queue Cap | Queue Full Hits | Pending Writes | Pending Overwrites | Applied Total | Events/Sec | Elapsed (s) |
 | ---- | --------- | --------------- | -------------- | ------------------ | ------------- | ---------- | ----------- |
-| Spin | 8 | 171,238,233 | 0 | 0 | 300,000 | 15,184 | 19.7577 |
-| Coalesce | 8 | 293,017 | 293,017 | 292,999 | 7,001 | 492,048 | 0.6097 |
-| Spin | 32 | 161,010,307 | 0 | 0 | 300,000 | 15,187 | 19.7536 |
-| Coalesce | 32 | 293,548 | 293,548 | 293,546 | 6,454 | 704,442 | 0.4259 |
-| Spin | 1024 | 166,899,600 | 0 | 0 | 300,000 | 15,196 | 19.7414 |
-| Coalesce | 1024 | 292,555 | 292,555 | 292,553 | 7,447 | 609,281 | 0.4924 |
+| Spin | 8 | 7,118,813 | 0 | 0 | 12,000 | 15,311 | 0.7837 |
+| Coalesce | 8 | 11,812 | 11,812 | 11,800 | 200 | 899,062 | 0.0133 |
+| Spin | 32 | 6,873,861 | 0 | 0 | 12,000 | 15,223 | 0.7883 |
+| Coalesce | 32 | 11,797 | 11,797 | 11,785 | 215 | 837,928 | 0.0143 |
+| Spin | 1024 | 6,744,629 | 0 | 0 | 12,000 | 15,313 | 0.7836 |
+| Coalesce | 1024 | 10,808 | 10,808 | 10,796 | 1,204 | 148,347 | 0.0809 |
 
 Findings:
 
-- The controlled overload rerun clearly demonstrates coalescing behavior at every queue size. `applied_total` dropped from `300,000` in every spin run to `7,001` at `q=8`, `6,454` at `q=32`, and `7,447` at `q=1024`, which is roughly a `97.5%` to `97.8%` reduction in applied work.
-- Coalesce mode was much faster under overload for every queue size. Throughput improved from about `15.2k events/sec` in spin mode to `492k` at `q=8`, `704k` at `q=32`, and `609k` at `q=1024`, corresponding to speedups of about `32.4x`, `46.4x`, and `40.1x`.
-- The pending map was heavily exercised in every coalesce run. Nearly all pending writes were overwrites: `292,999` at `q=8`, `293,546` at `q=32`, and `292,553` at `q=1024`. This is the exact pattern needed to collapse stale work.
-- Spin mode spent substantial time stalled on a full queue at every capacity, with `161M` to `171M` queue-full hits. Under this controlled overload, increasing queue capacity alone did not solve the backlog problem.
-- Spin outputs are identical across all three queue sizes. The final CSV always reports `BTCUSDT=200000` and `ETHUSDT=100000` in the `count` column, with the same latest timestamp and price state.
-- Coalesce preserved the latest state for each symbol at all queue sizes: `last_ts_ms`, `last_price`, and `last_qty` match the spin outputs in every overload CSV.
-- Coalesce did not preserve exact event counts. The coalesced `count` values vary by queue size: `BTCUSDT/ETHUSDT = 5494/1507` at `q=8`, `5090/1364` at `q=32`, and `5726/1721` at `q=1024`.
-- That means the current coalescing policy is correct for freshness of the latest value, but not for count-based accounting. Any downstream metric that depends on exact event totals is not preserved under overload coalescing.
+- The richer generated trace is sufficient to trigger overload in a single pass. There is no need for the earlier `--loop 100000` workaround once the dataset contains thousands of bursty, skewed events.
+- Spin mode remains bottlenecked by the delayed consumer at every queue size. Throughput stays almost flat at about `15.2k events/sec`, and increasing queue capacity from `8` to `1024` does not materially improve it.
+- Coalesce mode collapses most stale work at every queue size. `applied_total` falls from `12,000` in spin mode to `195` at `q=8`, `221` at `q=32`, and `1,206` at `q=1024`.
+- Relative to spin mode, coalescing reduces applied work by `98.3%` at `q=8`, `98.2%` at `q=32`, and `90.0%` at `q=1024`.
+- Coalesce is much faster than spin under this trace. Throughput improves to `899k events/sec` at `q=8`, `838k` at `q=32`, and `148k` at `q=1024`, which corresponds to speedups of about `58.7x`, `55.0x`, and `9.7x`.
+- Queue capacity now has a meaningful tradeoff inside the coalescing policy. Smaller queues force earlier coalescing and produce the most aggressive work reduction, while `q=1024` allows many more events to reach the consumer before being collapsed.
+- The pending map is doing real work in every coalesce run. Almost every pending write is an overwrite, which confirms that the dataset is hot-symbol-heavy enough to exercise the policy rather than just the queue plumbing.
+- Spin outputs are identical across all queue sizes, and coalesce preserves `last_ts_ms`, `last_price`, and `last_qty` for every symbol relative to the spin outputs.
+- `out/experiments/final_state_comparison.json` records that invariant directly. For `q8`, `q32`, and `q1024`, it reports `latest_state_match=true`, `count_match=false`, and `full_row_match=false`.
+- Coalesce still does not preserve exact event counts. It preserves latest-value freshness, but any downstream metric that depends on exact per-symbol totals will diverge under overload.
