@@ -7,6 +7,7 @@
 #include <atomic>
 #include <mutex>
 #include <nlohmann/json.hpp>
+#include <chrono>
 
 using json = nlohmann::json;
 
@@ -83,7 +84,8 @@ struct Ring
 };
 static void usage(const char *prog)
 {
-  std::cerr << "Usage: " << prog << " --input <path> [--out <final_state.csv>] [--loop N]\n";
+  std::cerr << "Usage: " << prog
+            << " --input <path> [--out <final_state.csv>] [--loop N] [--mode spin|coalesce]\n";
 }
 
 static bool parse_trade_line(const std::string &line, Event &e)
@@ -130,6 +132,7 @@ int main(int argc, char **argv)
   std::string input;
   std::string out = "final_state.csv";
   int loop = 1;
+  bool spin_on_full = false;
 
   for (int i = 1; i < argc; i++)
   {
@@ -145,6 +148,20 @@ int main(int argc, char **argv)
     }
     else if (a == "--loop" && i + 1 < argc)
       loop = std::stoi(argv[++i]);
+    else if (a == "--mode" && i + 1 < argc)
+    {
+      std::string mode = argv[++i];
+      if (mode == "spin")
+        spin_on_full = true;
+      else if (mode == "coalesce")
+        spin_on_full = false;
+      else
+      {
+        std::cerr << "Unknown mode: " << mode << "\n";
+        usage(argv[0]);
+        return 2;
+      }
+    }
     else
     {
       std::cerr << "Unknown arg: " << a << "\n";
@@ -186,6 +203,10 @@ int main(int argc, char **argv)
   long long pending_drains = 0;
   long long applied_from_queue = 0;
   long long applied_from_pending = 0;
+  long long pending_inserts = 0;
+  long long pending_overwrites = 0;
+
+  auto t0 = std::chrono::steady_clock::now();
 
   auto pending_empty = [&]()
   {
@@ -215,12 +236,24 @@ int main(int argc, char **argv)
 
         // yield, waste cpu and wait util available
         // use coalescing to change update producer behaviour 
-        if (!q.push(e)){
-          // std::this_thread::yield();
-          full_count++;
-          std::lock_guard<std::mutex> lock(pending_mu);
-          pending[e.symbol] = e;
-          pending_writes++;
+        if (spin_on_full) {
+          while (!q.push(e)) {
+            full_count++;
+            std::this_thread::yield();
+          }
+        } else {
+          if (!q.push(e)) {
+            full_count++;
+            std::lock_guard<std::mutex> lock(pending_mu);
+            auto it = pending.find(e.symbol);
+            if (it == pending.end()) {
+              pending_inserts++;
+            } else {
+              pending_overwrites++;
+            }
+            pending[e.symbol] = e;
+            pending_writes++;
+          }
         }
       
       }
@@ -269,6 +302,10 @@ int main(int argc, char **argv)
   producer.join();
   consumer.join();
 
+  auto t1 = std::chrono::steady_clock::now();
+  double elapsed_s = std::chrono::duration<double>(t1 - t0).count();
+  double events_per_sec = (elapsed_s > 0.0) ? (parsed / elapsed_s) : 0.0;
+
   std::ofstream fout(out);
   if (!fout.is_open())
   {
@@ -284,9 +321,12 @@ int main(int argc, char **argv)
          << st.last_qty << "," << st.count << "\n";
   }
 
+  std::cout << "mode=" << (spin_on_full ? "spin" : "coalesce") << "\n";
   std::cout << "queue_full_hits=" << full_count << "\n";
   std::cout << "pending_writes=" << pending_writes << " pending_drains=" << pending_drains << "\n";
+  std::cout << "pending_inserts=" << pending_inserts << " pending_overwrites=" << pending_overwrites << "\n";
   std::cout << "applied_from_queue=" << applied_from_queue << " applied_from_pending=" << applied_from_pending << "\n";
+  std::cout << "elapsed s=" << elapsed_s << " events_per_sec=" << events_per_sec << "\n";
   std::cout << "lines=" << lines << " parsed=" << parsed << " bad=" << bad
             << " symbols=" << latest.size() << "\n";
   std::cout << "wrote=" << out << "\n";
