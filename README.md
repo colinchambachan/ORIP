@@ -228,24 +228,49 @@ regenerates `data/trades.jsonl`, runs spin/coalesce replay across queue capaciti
 - `out/experiments/*.json`
 - `out/experiments/final_state_comparison.json`
 
-Repo design
+## 16. Repo Layout
+
+Current repo layout:
+
+```text
 .
 ├── Makefile
-├── SPEC.md
 ├── README.md
+├── .gitignore
 ├── src/
-│ ├── ingest/ # Step 1 (stable)
-│ │ ├── replay.cpp
-│ │ ├── ring.h
-│ │ └── coalesce.h
-│ ├── app/
-│ │ └── replay_main.cpp
-│ ├── train/ # Step 2 (later)
-│ │ ├── trainer.cpp
-│ │ ├── aggregator.cpp
-│ │ └── model.h
-│ └── common/
-│ └── event.h
+│   └── replay_main.cpp
+├── scripts/
+│   ├── generate_trade_data.py
+│   ├── run_experiments.sh
+│   └── compare_final_states.py
+├── data/
+│   └── trades.jsonl
+├── out/
+│   ├── RESULTS.md
+│   ├── experiments/
+│   │   ├── spin_q*.csv
+│   │   ├── spin_q*.json
+│   │   ├── coalesce_q*.csv
+│   │   ├── coalesce_q*.json
+│   │   ├── final_state_comparison.json
+│   │   └── archive/
+│   └── final_state*.csv
+└── third_party/
+    └── nlohmann/
+        └── json.hpp
+```
+
+Planned Step 2 expansion:
+
+```text
+.
+├── src/train/
+│   ├── trainer.cpp
+│   ├── aggregator.cpp
+│   └── model.h
+├── src/common/
+│   └── event.h
 ├── tests/
 └── report/
-└── paper.tex
+    └── paper.tex
+```
