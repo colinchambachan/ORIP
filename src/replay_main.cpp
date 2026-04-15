@@ -3,111 +3,290 @@
 #include <string>
 #include <unordered_map>
 #include <iomanip>
-
+#include <thread>
+#include <atomic>
+#include <mutex>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
 
-struct Latest {
+struct Latest
+{
   long long last_ts_ms = 0;
   double last_price = 0.0;
   double last_qty = 0.0;
   long long count = 0;
 };
 
-static void usage(const char* prog) {
-    std::cerr << "Usage: " << prog << " --input <path> [--out <final_state.csv>] [--loop N]\n";
-}
+struct Event
+{
+  long long ts_ms;
+  std::string symbol;
+  double price;
+  double qty;
+};
 
-static bool parse_trade_line(const std::string& line,
-                             long long& ts_ms,
-                             std::string& symbol,
-                             double& price,
-                             double& qty) {
-  try {
-    auto j = json::parse(line);
+// Single produce single consumer queue. thread safe
 
-    // Expect normalized JSONL lines like:
-    // {"ts_ms": 170..., "symbol":"BTCUSDT", "price":42000.5, "qty":0.01}
-    ts_ms = j.at("ts_ms").get<long long>();
-    symbol = j.at("symbol").get<std::string>();
+// !We intentionally leave 1 slot unused.
+// Full condition is (next_head == tail), so max usable capacity is CAP - 1.
+// This allows us to distinguish full vs empty without extra state.
+template <typename T, size_t CAP>
+struct Ring
+{
+  static_assert(CAP >= 2, "CAP must be at least 2");
+  T buf[CAP];
+  std::atomic<size_t> head{0};
+  std::atomic<size_t> tail{0};
 
-    // price/qty might be number or string depending on how you recorded it
-    if (j.at("price").is_string()) price = std::stod(j.at("price").get<std::string>());
-    else price = j.at("price").get<double>();
+  bool push(const T &val)
+  {
 
-    if (j.at("qty").is_string()) qty = std::stod(j.at("qty").get<std::string>());
-    else qty = j.at("qty").get<double>();
+    /*
+    relaxed: atomic, but no ordering guarantees
+    acquire: when read, must also see earlier writes that were published before
+    release: publish my earlier writes before making this visible
+    */
+
+    // part of atomic operations
+    size_t h = head.load(std::memory_order_relaxed);
+    size_t next = (h + 1) % CAP;
+    size_t t = tail.load(std::memory_order_acquire);
+
+    if (next == t)
+      return false; // queue is full
+
+    buf[h] = val;
+    head.store(next, std::memory_order_release);
+    return true;
+  }
+
+  bool pop(T &val)
+  {
+    size_t t = tail.load(std::memory_order_relaxed);
+    size_t h = head.load(std::memory_order_acquire);
+
+    if (t == h)
+      return false; // queue is empty
+
+    val = buf[t];
+    size_t next = (t + 1) % CAP;
+    tail.store(next, std::memory_order_release);
 
     return true;
-  } catch (...) {
+  }
+
+  bool empty() const
+  {
+    return head.load(std::memory_order_acquire) == tail.load(std::memory_order_acquire);
+  };
+};
+static void usage(const char *prog)
+{
+  std::cerr << "Usage: " << prog << " --input <path> [--out <final_state.csv>] [--loop N]\n";
+}
+
+static bool parse_trade_line(const std::string &line, Event &e)
+{
+  try
+  {
+    auto j = json::parse(line);
+
+    e.ts_ms = j.at("ts_ms").get<long long>();
+    e.symbol = j.at("symbol").get<std::string>();
+
+    if (j.at("price").is_string())
+      e.price = std::stod(j.at("price").get<std::string>());
+    else
+      e.price = j.at("price").get<double>();
+
+    if (j.at("qty").is_string())
+      e.qty = std::stod(j.at("qty").get<std::string>());
+    else
+      e.qty = j.at("qty").get<double>();
+
+    return true;
+  }
+  catch (...)
+  {
     return false;
   }
 }
 
-int main(int argc, char** argv) {
+static inline void apply_event(std::unordered_map<std::string, Latest> &latest, const Event &e)
+{
+  auto &st = latest[e.symbol];
+  if (e.ts_ms >= st.last_ts_ms)
+  { // latest-write-wins by timestamp
+    st.last_ts_ms = e.ts_ms;
+    st.last_price = e.price;
+    st.last_qty = e.qty;
+  }
+  st.count++;
+}
+
+int main(int argc, char **argv)
+{
   std::string input;
   std::string out = "final_state.csv";
   int loop = 1;
 
-
-  for (int i = 1; i < argc; i++) {
+  for (int i = 1; i < argc; i++)
+  {
     std::string a = argv[i];
-    if (a == "--input" && i + 1 < argc) input = argv[++i];
-    else if (a == "--out" && i + 1 < argc) out = argv[++i];
-    else if (a == "--help") { usage(argv[0]); return 0; }
-    else if (a == "--loop" && i + 1 < argc) loop = std::stoi(argv[++i]);
-    else { std::cerr << "Unknown arg: " << a << "\n"; usage(argv[0]); return 2; }
+    if (a == "--input" && i + 1 < argc)
+      input = argv[++i];
+    else if (a == "--out" && i + 1 < argc)
+      out = argv[++i];
+    else if (a == "--help")
+    {
+      usage(argv[0]);
+      return 0;
+    }
+    else if (a == "--loop" && i + 1 < argc)
+      loop = std::stoi(argv[++i]);
+    else
+    {
+      std::cerr << "Unknown arg: " << a << "\n";
+      usage(argv[0]);
+      return 2;
+    }
   }
 
-  if (loop < 1) { std::cerr << "--loop must be >= 1\n"; return 2; }
-
-  if (input.empty()) { std::cerr << "Missing --input\n"; usage(argv[0]); return 2; }
+  if (loop < 1)
+  {
+    std::cerr << "--loop must be >= 1\n";
+    return 2;
+  }
+  if (input.empty())
+  {
+    std::cerr << "Missing --input\n";
+    usage(argv[0]);
+    return 2;
+  }
 
   std::ifstream in(input);
-  if (!in.is_open()) { std::cerr << "Failed to open: " << input << "\n"; return 1; }
+  if (!in.is_open())
+  {
+    std::cerr << "Failed to open: " << input << "\n";
+    return 1;
+  }
 
   std::unordered_map<std::string, Latest> latest;
+  // Ring<Event, 1024> q;
+  Ring<Event, 8> q;
+  std::unordered_map<std::string, Event> pending;
+  std::mutex pending_mu;
+
+  std::atomic<bool> done{false};
   long long lines = 0, parsed = 0, bad = 0;
+  long long full_count = 0;
 
-  std::string line;
-  for (int pass = 0; pass < loop; pass++) {
-    // clear eof and seek to start again
-    in.clear();
-    // move input stream back to beginning
-    in.seekg(0, std::ios::beg);
-    while (std::getline(in, line)) {
+  long long pending_writes = 0;
+  long long pending_drains = 0;
+  long long applied_from_queue = 0;
+  long long applied_from_pending = 0;
+
+  auto pending_empty = [&]()
+  {
+    std::lock_guard<std::mutex> lock(pending_mu);
+    return pending.empty();
+  };
+
+  std::thread producer([&]
+                       {
+    std::string line_local;
+    for (int pass = 0; pass < loop; pass++) {
+      // clear and reset the input stream
+      in.clear();
+      // move 'cursor' to the beginning of the file
+      in.seekg(0, std::ios::beg);
+
+      while (std::getline(in, line_local)) {
+        // count the number of lines in the file
         lines++;
-        if (line.empty()) continue;
+        if (line_local.empty()) continue;
 
-        long long ts_ms;
-        std::string symbol;
-        double price, qty;
-
-        if (!parse_trade_line(line, ts_ms, symbol, price, qty)) {
-        bad++;
-        continue;
-        }
-
+        // parse the line into an Event
+        Event e;
+        if (!parse_trade_line(line_local, e)) { bad++; continue; }
         parsed++;
-        auto& st = latest[symbol];
-        if (ts_ms >= st.last_ts_ms) { // keep latest by timestamp
-        st.last_ts_ms = ts_ms;
-        st.last_price = price;
-        st.last_qty = qty;
+      
+
+        // yield, waste cpu and wait util available
+        // use coalescing to change update producer behaviour 
+        if (!q.push(e)){
+          // std::this_thread::yield();
+          full_count++;
+          std::lock_guard<std::mutex> lock(pending_mu);
+          pending[e.symbol] = e;
+          pending_writes++;
         }
-        st.count++;
+      
+      }
     }
+    done.store(true, std::memory_order_release); });
+
+  std::thread consumer([&]
+                       {
+    Event e;
+    while (!done.load(std::memory_order_acquire) || !q.empty() || !pending_empty())
+    {
+      // aritifical delay to simulate processing time and grow queue
+      // std::this_thread::sleep_for(std::chrono::microseconds(50));
+      bool did_work = false;
+    Event pe;
+
+    if (q.pop(e)) {
+      apply_event(latest, e);
+      applied_from_queue++;
+      did_work = true;
+    } else {
+      bool got_pending = false;
+      {
+        std::lock_guard<std::mutex> lock(pending_mu);
+        if (!pending.empty()) {
+          auto it = pending.begin();
+          pe = it->second;
+          pending.erase(it);
+          pending_drains++;
+          got_pending = true;
+        }
+      }
+
+      if (got_pending) {
+        apply_event(latest, pe);
+        applied_from_pending++;
+        did_work = true;
+      }
     }
+
+    if (!did_work) {
+      std::this_thread::yield();
+    }
+  } });
+
+  producer.join();
+  consumer.join();
+
   std::ofstream fout(out);
-  if (!fout.is_open()) { std::cerr << "Failed to write: " << out << "\n"; return 1; }
+  if (!fout.is_open())
+  {
+    std::cerr << "Failed to write: " << out << "\n";
+    return 1;
+  }
 
   fout << "symbol,last_ts_ms,last_price,last_qty,count\n";
   fout << std::setprecision(17);
-  for (const auto& [sym, st] : latest) {
-    fout << sym << "," << st.last_ts_ms << "," << st.last_price << "," << st.last_qty << "," << st.count << "\n";
+  for (const auto &[sym, st] : latest)
+  {
+    fout << sym << "," << st.last_ts_ms << "," << st.last_price << ","
+         << st.last_qty << "," << st.count << "\n";
   }
 
+  std::cout << "queue_full_hits=" << full_count << "\n";
+  std::cout << "pending_writes=" << pending_writes << " pending_drains=" << pending_drains << "\n";
+  std::cout << "applied_from_queue=" << applied_from_queue << " applied_from_pending=" << applied_from_pending << "\n";
   std::cout << "lines=" << lines << " parsed=" << parsed << " bad=" << bad
             << " symbols=" << latest.size() << "\n";
   std::cout << "wrote=" << out << "\n";
