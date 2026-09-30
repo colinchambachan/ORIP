@@ -1,6 +1,23 @@
-# Overload-Resilient Ingestion Pipeline + Distributed learning model
+# Overload-Resilient Ingestion Pipeline (ORIP)
 
-## Product Requirements Document
+> **Status (September 2026):** Step 1 (the overload-resilient ingestion engine) is complete. The original Step 2 (distributed online training) was **cut**. It is replaced by a small, time-boxed **inference-serving overload study** that reuses Step 1's pipeline and asks the same question about serving ML requests. Plan and progress: [`docs/SERVING_PLAN.md`](docs/SERVING_PLAN.md).
+
+## Project Outcome
+
+**What was built:** A single-producer / single-consumer replay pipeline in C++20 with a lock-free bounded ring buffer and two overload policies:
+
+- **Spin** (backpressure): the producer blocks until the queue has room, so every event is applied.
+- **Coalesce** (latest-write-wins): when the queue is full, events go into a per-symbol pending map, and each newer event overwrites the older one.
+
+**What the experiment showed** (full numbers in [`out/RESULTS.md`](out/RESULTS.md)): on a deterministic, bursty, hot-key-skewed trace, coalescing cuts consumer work by roughly 90–98% while keeping the latest per-symbol state identical to the lossless run. The cost is that per-key event counts become inexact. That is the tradeoff: freshness in exchange for completeness.
+
+**Why Step 2 was cut:** Distributed online regression on market data doesn't serve my current focus on ML systems (inference, serving, partitioning). Step 1's real question (under overload, do you queue, drop, or coalesce?) is central to ML serving, though. So the project continues as a bounded study of dynamic batching and load shedding in a simulated inference server. See [`docs/SERVING_PLAN.md`](docs/SERVING_PLAN.md).
+
+**Not delivered from the original PRD:** unit tests, queue-depth statistics, live WebSocket ingestion (the trace is synthetic but reproducible), and the LaTeX report (`out/RESULTS.md` covers the write-up instead).
+
+---
+
+## Product Requirements Document (original)
 
 ## 1. Background & Motivation
 
@@ -106,7 +123,9 @@ When input events arrive faster than they can be processed, naive systems accumu
 
 ---
 
-# STEP 2: Distributed Real-Time Model Training
+# STEP 2: Distributed Real-Time Model Training — CUT
+
+> **Not implemented.** This section is kept as the original design record. See [Project Outcome](#project-outcome) for why it was cut.
 
 ## 8. Problem Statement (Step 2)
 
@@ -237,6 +256,8 @@ Current repo layout:
 ├── Makefile
 ├── README.md
 ├── .gitignore
+├── docs/
+│   └── SERVING_PLAN.md
 ├── src/
 │   └── replay_main.cpp
 ├── scripts/
@@ -258,19 +279,4 @@ Current repo layout:
 └── third_party/
     └── nlohmann/
         └── json.hpp
-```
-
-Planned Step 2 expansion:
-
-```text
-.
-├── src/train/
-│   ├── trainer.cpp
-│   ├── aggregator.cpp
-│   └── model.h
-├── src/common/
-│   └── event.h
-├── tests/
-└── report/
-    └── paper.tex
 ```

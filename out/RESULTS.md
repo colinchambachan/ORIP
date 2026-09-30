@@ -26,25 +26,28 @@ The relevant artifacts are:
 
 Older two-symbol overload artifacts from the earlier synthetic stress run were moved to `out/experiments/archive/` so they do not get confused with the current dataset-backed evaluation.
 
-| Mode | Queue Cap | Queue Full Hits | Pending Writes | Pending Overwrites | Applied Total | Input Events/Sec | Elapsed (s) |
-| ---- | --------- | --------------- | -------------- | ------------------ | ------------- | ---------------- | ----------- |
-| Spin | 8 | 7,118,813 | 0 | 0 | 12,000 | 15,311 | 0.7837 |
-| Coalesce | 8 | 11,812 | 11,812 | 11,800 | 200 | 899,062 | 0.0133 |
-| Spin | 32 | 6,873,861 | 0 | 0 | 12,000 | 15,223 | 0.7883 |
-| Coalesce | 32 | 11,797 | 11,797 | 11,785 | 215 | 837,928 | 0.0143 |
-| Spin | 1024 | 6,744,629 | 0 | 0 | 12,000 | 15,313 | 0.7836 |
-| Coalesce | 1024 | 10,808 | 10,808 | 10,796 | 1,204 | 148,347 | 0.0809 |
+| Mode     | Queue Cap | Queue-Full Count¹ | Pending Overwrites | Applied Total | Work Skipped | Drain Time (s)² | Latency p50 / p99 (µs)³ |
+| -------- | --------- | ----------------- | ------------------ | ------------- | ------------ | --------------- | ----------------------- |
+| Spin     | 8         | 9,795,629 retries | 0                  | 12,000        | 0%           | 0.9329          | 618 / 653               |
+| Coalesce | 8         | 11,843 events     | 11,831             | 169           | 98.6%        | 0.0133          | 547 / 1,331             |
+| Spin     | 32        | 9,748,374 retries | 0                  | 12,000        | 0%           | 0.9340          | 2,473 / 2,791           |
+| Coalesce | 32        | 11,810 events     | 11,798             | 202           | 98.3%        | 0.0159          | 2,424 / 3,159           |
+| Spin     | 1024      | 9,109,919 retries | 0                  | 12,000        | 0%           | 0.9317          | 79,435 / 80,217         |
+| Coalesce | 1024      | 10,832 events     | 10,820             | 1,180         | 90.2%        | 0.0926          | 45,695 / 80,230         |
+
+Numbers are from one run. Timing-dependent columns vary slightly between runs.
+
+¹ **Not comparable across modes.** In spin mode, the producer retries in a loop while the queue is full, so the counter goes up once per retry. In coalesce mode it goes up once per event diverted to the pending map. (For coalesce, this also equals `pending_writes`.)
+
+² Wall time to ingest and drain the whole trace (`elapsed_s`). This used to be reported as "Input Events/Sec" (parsed ÷ elapsed). That number is dropped because it made coalesce look 10–60× "faster". Coalesce finishes sooner mainly because it *skips* 90–98% of the work, not because it processes events faster.
+
+³ Time from ingest (right after parsing) to the moment the consumer dequeues the event, over all applied events. For coalesced events, this is measured from the ingest of the *newest* value for that symbol, so it reflects state freshness.
 
 Findings:
 
-- The richer generated trace is sufficient to trigger overload in a single pass. There is no need for the earlier `--loop 100000` workaround once the dataset contains thousands of bursty, skewed events.
-- Spin mode remains bottlenecked by the delayed consumer at every queue size. Throughput stays almost flat at about `15.2k events/sec`, and increasing queue capacity from `8` to `1024` does not materially improve it.
-- Coalesce mode collapses most stale work at every queue size. `applied_total` falls from `12,000` in spin mode to `200` at `q=8`, `215` at `q=32`, and `1,204` at `q=1024`.
-- Relative to spin mode, coalescing reduces applied work by `98.3%` at `q=8`, `98.2%` at `q=32`, and `90.0%` at `q=1024`.
-- Coalesce is much faster than spin under this trace. Throughput improves to `899k events/sec` at `q=8`, `838k` at `q=32`, and `148k` at `q=1024`, which corresponds to speedups of about `58.7x`, `55.0x`, and `9.7x`.
-- Queue capacity now has a meaningful tradeoff inside the coalescing policy. Smaller queues force earlier coalescing and produce the most aggressive work reduction, while `q=1024` allows many more events to reach the consumer before being collapsed.
-- The pending map is doing real work in every coalesce run. Almost every pending write is an overwrite, which confirms that the dataset is hot-symbol-heavy enough to exercise the policy rather than just the queue plumbing.
-- Spin outputs are identical across all queue sizes, and coalesce preserves `last_ts_ms`, `last_price`, and `last_qty` for every symbol relative to the spin outputs.
-- `out/experiments/final_state_comparison.json` records that invariant directly. For `q8`, `q32`, and `q1024`, it reports `latest_state_match=true`, `count_match=false`, and `full_row_match=false`.
-- Under overload, coalescing preserves latest-value correctness but intentionally sacrifices exact per-key event counts.
-- Coalesce still does not preserve exact event counts. It preserves latest-value freshness, but any downstream metric that depends on exact per-symbol totals will diverge under overload.
+- **The trace triggers overload in a single pass.** With 12,000 bursty, hot-key-skewed events, the delayed consumer (about 78 µs per event) falls behind without the earlier `--loop 100000` workaround.
+- **Spin is limited by the consumer.** Drain time stays about 0.93 s at every queue size. A bigger queue only holds more backlog; it doesn't add capacity.
+- **In both modes, per-event latency is set by queue capacity, not the policy.** p99 is about queue cap × 78 µs: roughly 0.65 ms at q=8, 2.8 ms at q=32, and 80 ms at q=1024. This is Little's law: a full FIFO of N events, served at a fixed rate, makes every event wait about N service times. Coalescing doesn't shorten that wait, because the ring still fills with (stale) events, and the pending map is only drained once the ring is empty. So its pending-path p99 is about the same (1.4 ms, 3.3 ms, 81 ms).
+- **Spin's latency numbers understate how stale it gets (coordinated omission).** A blocked spin producer stops reading input, so the backlog builds up in the input file where nothing timestamps it. The measured p99 looks bounded, but the last event is applied about 0.93 s after the run starts, compared with about 0.013 s for coalesce at q=8. Because replay isn't paced by `ts_ms`, "arrival time" isn't defined, and that staleness can't be measured correctly here. Fixing this is the first step of the serving follow-up (`docs/SERVING_PLAN.md`, M1: paced arrivals).
+- **Coalesce's real win is reaching fresh state sooner, with far less work.** It skips 90–98% of the work and reaches a correct latest state 10–70× sooner. A small queue plus coalescing (q=8) gives both the shortest drain time and a sub-1.5 ms p99.
+- **Latest-value correctness is preserved; exact counts are not.** Spin outputs are identical across queue sizes. Coalesce matches them on `last_ts_ms`, `last_price`, and `last_qty` for every symbol, but not on per-symbol counts (`final_state_comparison.json`: `latest_state_match=true`, `count_match=false` for all caps). Anything downstream that depends on exact per-key totals would be wrong under this policy.
