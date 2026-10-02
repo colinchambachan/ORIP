@@ -1,6 +1,6 @@
 # Overload-Resilient Ingestion Pipeline (ORIP)
 
-> **Status (September 2026):** Step 1 (the overload-resilient ingestion engine) is complete. The original Step 2 (distributed online training) was **cut**. It is replaced by a small, time-boxed **inference-serving overload study** that reuses Step 1's pipeline and asks the same question about serving ML requests. Plan and progress: [`docs/SERVING_PLAN.md`](docs/SERVING_PLAN.md).
+> **Status (September 2026):** Step 1 (the overload-resilient ingestion engine) is complete. The original Step 2 (distributed online training) was **cut**. It was replaced by a small, time-boxed **inference-serving overload study** (dynamic batching and load shedding in a simulated model server), which is also complete. Results: [`out/RESULTS.md`](out/RESULTS.md) (Step 1) and [`out/RESULTS_SERVING.md`](out/RESULTS_SERVING.md) (serving study). Plan: [`docs/SERVING_PLAN.md`](docs/SERVING_PLAN.md).
 
 ## Project Outcome
 
@@ -12,6 +12,8 @@
 **What the experiment showed** (full numbers in [`out/RESULTS.md`](out/RESULTS.md)): on a deterministic, bursty, hot-key-skewed trace, coalescing cuts consumer work by roughly 90–98% while keeping the latest per-symbol state identical to the lossless run. The cost is that per-key event counts become inexact. That is the tradeoff: freshness in exchange for completeness.
 
 **Why Step 2 was cut:** Distributed online regression on market data doesn't serve my current focus on ML systems (inference, serving, partitioning). Step 1's real question (under overload, do you queue, drop, or coalesce?) is central to ML serving, though. So the project continues as a bounded study of dynamic batching and load shedding in a simulated inference server. See [`docs/SERVING_PLAN.md`](docs/SERVING_PLAN.md).
+
+**Serving study (Phase 2):** `src/serve_main.cpp` replays the same trace as paced request arrivals into a simulated model server with a 50 ms SLO. Findings: dynamic batching is the biggest lever (about 13× capacity from batch 1 to 32). Past capacity, queueing everything collapses goodput. Rejecting at arrival, with a queue limit sized from the SLO, beats expiring stale requests at dequeue (about 30% more on-time requests). Build with `make`, run with `scripts/run_serving_experiments.sh`.
 
 **Not delivered from the original PRD:** unit tests, queue-depth statistics, live WebSocket ingestion (the trace is synthetic but reproducible), and the LaTeX report (`out/RESULTS.md` covers the write-up instead).
 
@@ -259,15 +261,19 @@ Current repo layout:
 ├── docs/
 │   └── SERVING_PLAN.md
 ├── src/
-│   └── replay_main.cpp
+│   ├── replay_main.cpp          # Step 1: ingestion engine (spin vs coalesce)
+│   └── serve_main.cpp           # Phase 2: simulated inference server
 ├── scripts/
 │   ├── generate_trade_data.py
 │   ├── run_experiments.sh
+│   ├── run_serving_experiments.sh
 │   └── compare_final_states.py
 ├── data/
 │   └── trades.jsonl
 ├── out/
 │   ├── RESULTS.md
+│   ├── RESULTS_SERVING.md
+│   ├── serving/                 # per-run JSON + summary.md
 │   ├── experiments/
 │   │   ├── spin_q*.csv
 │   │   ├── spin_q*.json
