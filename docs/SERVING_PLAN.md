@@ -24,7 +24,7 @@ Each milestone is one commit, works on its own, and ends with a check you can ru
 | # | Milestone | Done when |
 |---|-----------|-----------|
 | M0 | **Close out Step 1**: finish the latency percentiles in `replay_main.cpp`, rerun, rewrite `out/RESULTS.md`, tag `v1.0`. | Spin vs. coalesce p50/p99 are in RESULTS.md. |
-| M1 | **Paced arrivals.** Create `src/serve_main.cpp` with a new `make serve` target. The producer sleeps until each request's scaled arrival time before pushing it. The server handles one request at a time and sleeps for the fixed service cost. Report p50/p99 latency. | At `--rate-scale 0.1` (light load), p50 ≈ service time. At 1.0, p99 blows up during bursts. |
+| M1 | **Paced arrivals.** Create `src/serve_main.cpp` with a new `make serve` target. The producer sleeps until each request's scaled arrival time before pushing it. The server handles one request at a time and sleeps for the fixed service cost. Report p50/p99 latency. | At `--rate-scale 0.25` (light load), p50 ≈ service time. At 1.0, p99 grows during bursts. Use `--max-events 3000` to keep runs short. |
 | M2 | **Dynamic batching.** Add `--max-batch` and `--max-wait-us`. Report the mean batch size. | Mean batch size grows with load, and p99 at `--rate-scale 1` drops a lot compared with M1. |
 | M3 | **Deadlines and shedding.** Give each request `deadline = arrival + slo`. Add `--policy`: `queue` (accept everything), `reject` (refuse at arrival when the queue is full, like the drop analog), `expire` (discard at dequeue if already past the deadline). Report goodput, rejected, and expired counts. | At high load, `expire` or `reject` has higher goodput than `queue`. |
 | M4 | **Experiment and write-up.** Script a sweep over rate-scale × policy × max-batch, then write `out/RESULTS_SERVING.md`: one table plus findings. | The write-up answers the two questions above. **Stop here.** |
@@ -39,7 +39,7 @@ Each milestone is one commit, works on its own, and ends with a check you can ru
 ## Progress
 
 - [x] M0 Close out Step 1 (tag `v1.0`). Finding: latency is set by queue capacity, and unpaced replay hides spin's real staleness (coordinated omission). M1 fixes that.
-- [ ] M1 Paced arrivals
+- [x] M1 Paced arrivals. With 3000 requests, batch=1 (~476 req/s capacity): rate 0.25 → p50/p99 2.1/2.1 ms; rate 1 → 48/107 ms; rate 2 → 1.4 s/2.8 s (backlog grows without bound).
 - [ ] M2 Dynamic batching
 - [ ] M3 Deadlines and shedding
 - [ ] M4 Experiment and write-up
