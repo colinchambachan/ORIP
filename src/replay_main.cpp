@@ -9,6 +9,8 @@
 #include <nlohmann/json.hpp>
 #include <chrono>
 #include <sstream>
+#include <vector>
+#include <algorithm>
 
 using json = nlohmann::json;
 
@@ -26,6 +28,7 @@ struct Event
   std::string symbol;
   double price;
   double qty;
+  std::chrono::steady_clock::time_point ingest_ts;
 };
 
 // Single produce single consumer queue. thread safe
@@ -94,6 +97,15 @@ static void usage(const char *prog)
 static bool parse_trade_line(const std::string &line, Event &e);
 static inline void apply_event(std::unordered_map<std::string, Latest> &latest, const Event &e);
 
+// Nearest-rank percentile. Takes a copy so it can sort without touching the caller's data.
+static long long percentile(std::vector<long long> v, double p)
+{
+  if (v.empty())
+    return 0;
+  std::sort(v.begin(), v.end());
+  return v[static_cast<size_t>(p * (v.size() - 1))];
+}
+
 template <size_t QCAP>
 static int run_replay(const std::string &input, const std::string &out, int loop, bool spin_on_full, const std::string &metrics_out)
 {
@@ -120,6 +132,12 @@ static int run_replay(const std::string &input, const std::string &out, int loop
   long long applied_from_pending = 0;
   long long pending_inserts = 0;
   long long pending_overwrites = 0;
+  std::vector<long long> lat_queue_us;
+  std::vector<long long> lat_pending_us;
+
+  lat_queue_us.reserve(64000);
+  lat_pending_us.reserve(64000);
+
 
   auto t0 = std::chrono::steady_clock::now();
 
@@ -147,6 +165,8 @@ static int run_replay(const std::string &input, const std::string &out, int loop
         Event e;
         if (!parse_trade_line(line_local, e)) { bad++; continue; }
         parsed++;
+        // stamp after parsing so JSON cost isn't counted as queueing delay
+        e.ingest_ts = std::chrono::steady_clock::now();
 
         // yield, waste cpu and wait util available
         // use coalescing to change update producer behaviour 
@@ -181,11 +201,14 @@ static int run_replay(const std::string &input, const std::string &out, int loop
       // aritifical delay to simulate processing time and grow queue
       std::this_thread::sleep_for(std::chrono::microseconds(50));
       bool did_work = false;
+      auto now = std::chrono::steady_clock::now();
+
       Event pe;
 
       if (q.pop(e)) {
         apply_event(latest, e);
         applied_from_queue++;
+        lat_queue_us.push_back(std::chrono::duration_cast<std::chrono::microseconds>(now - e.ingest_ts).count());
         did_work = true;
       } else {
         bool got_pending = false;
@@ -203,6 +226,8 @@ static int run_replay(const std::string &input, const std::string &out, int loop
         if (got_pending) {
           apply_event(latest, pe);
           applied_from_pending++;
+          // pe.ingest_ts is from the newest overwrite, so this is the age of the freshest value
+          lat_pending_us.push_back(std::chrono::duration_cast<std::chrono::microseconds>(now - pe.ingest_ts).count());
           did_work = true;
         }
       }
@@ -219,6 +244,12 @@ static int run_replay(const std::string &input, const std::string &out, int loop
   double elapsed_s = std::chrono::duration<double>(t1 - t0).count();
   double events_per_sec = (elapsed_s > 0.0) ? (parsed / elapsed_s) : 0.0;
   long long applied_total = applied_from_queue + applied_from_pending;
+
+  std::vector<long long> lat_all_us = lat_queue_us;
+  lat_all_us.insert(lat_all_us.end(), lat_pending_us.begin(), lat_pending_us.end());
+  long long p50_us = percentile(lat_all_us, 0.50);
+  long long p99_us = percentile(lat_all_us, 0.99);
+  long long max_us = percentile(lat_all_us, 1.0);
 
   std::ofstream fout(out);
   if (!fout.is_open())
@@ -261,6 +292,11 @@ static int run_replay(const std::string &input, const std::string &out, int loop
     mout << "  \"parsed\": " << parsed << ",\n";
     mout << "  \"bad\": " << bad << ",\n";
     mout << "  \"symbols\": " << latest.size() << ",\n";
+    mout << "  \"latency_p50_us\": " << p50_us << ",\n";
+    mout << "  \"latency_p99_us\": " << p99_us << ",\n";
+    mout << "  \"latency_max_us\": " << max_us << ",\n";
+    mout << "  \"latency_queue_p99_us\": " << percentile(lat_queue_us, 0.99) << ",\n";
+    mout << "  \"latency_pending_p99_us\": " << percentile(lat_pending_us, 0.99) << ",\n";
     mout << "  \"final_state_out\": \"" << out << "\"\n";
     mout << "}\n";
   }
@@ -273,6 +309,7 @@ static int run_replay(const std::string &input, const std::string &out, int loop
   std::cout << "applied_from_queue=" << applied_from_queue << " applied_from_pending=" << applied_from_pending << "\n";
   std::cout << "applied_total=" << applied_total << "\n";
   std::cout << "elapsed_s=" << elapsed_s << " events_per_sec=" << events_per_sec << "\n";
+  std::cout << "latency_us p50=" << p50_us << " p99=" << p99_us << " max=" << max_us << "\n";
   std::cout << "lines=" << lines << " parsed=" << parsed << " bad=" << bad
             << " symbols=" << latest.size() << "\n";
   std::cout << "wrote=" << out << "\n";

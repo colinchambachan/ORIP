@@ -1,7 +1,7 @@
 {
   "mode": "spin",
   "queue_cap": 1024,
-  "queue_full_hits": 6744629,
+  "queue_full_hits": 9109919,
   "pending_writes": 0,
   "pending_drains": 0,
   "pending_inserts": 0,
@@ -9,11 +9,16 @@
   "applied_from_queue": 12000,
   "applied_from_pending": 0,
   "applied_total": 12000,
-  "elapsed_s": 0.783638,
-  "events_per_sec": 15313.2,
+  "elapsed_s": 0.931655,
+  "events_per_sec": 12880.3,
   "lines": 12000,
   "parsed": 12000,
   "bad": 0,
   "symbols": 12,
+  "latency_p50_us": 79435,
+  "latency_p99_us": 80217,
+  "latency_max_us": 80382,
+  "latency_queue_p99_us": 80217,
+  "latency_pending_p99_us": 0,
   "final_state_out": "out/experiments/spin_q1024.csv"
 }
