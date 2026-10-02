@@ -21,6 +21,15 @@ struct Request
   // around to pushing it. Measuring from here avoids coordinated omission: if the producer is
   // blocked on a full queue, that waiting still counts against the request.
   Clock::time_point arrival;
+  Clock::time_point deadline; // arrival + SLO
+};
+
+// What to do when the server can't keep up.
+enum class Policy
+{
+  Queue,  // accept everything; producer blocks when the queue is at its limit
+  Reject, // refuse new requests at arrival when the queue is at its limit
+  Expire  // accept everything, but the server discards requests already past their deadline
 };
 
 // Same SPSC ring as replay_main.cpp (one slot left unused to tell full from empty).
@@ -41,6 +50,14 @@ struct Ring
     buf[h] = val;
     head.store(next, std::memory_order_release);
     return true;
+  }
+
+  // Approximate depth. Exact when called from the producer, since only it moves head.
+  size_t size() const
+  {
+    size_t h = head.load(std::memory_order_acquire);
+    size_t t = tail.load(std::memory_order_acquire);
+    return (h + CAP - t) % CAP;
   }
 
   bool pop(T &val)
@@ -64,6 +81,9 @@ struct Config
   long long per_item_us = 100; // extra cost per request in the batch
   size_t max_batch = 1;         // 1 = no batching (M1 behaviour)
   long long max_wait_us = 0;    // how long to hold a partial batch hoping it fills
+  long long slo_ms = 50;
+  Policy policy = Policy::Queue;
+  size_t queue_limit = 4095; // producer treats the queue as full at this depth (ring max is 4095)
 };
 
 // sleep_for overshoots by ~40% on macOS, which would skew every latency number.
@@ -130,6 +150,9 @@ static int run_serve(const Config &cfg)
   Ring<Request, 4096> q;
   std::atomic<bool> done{false};
   long long queue_full_hits = 0;
+  long long rejected = 0; // producer-only
+  long long expired = 0;  // server-only
+  long long on_time = 0;  // server-only
 
   std::vector<long long> latency_us;
   latency_us.reserve(offsets_us.size());
@@ -142,13 +165,16 @@ static int run_serve(const Config &cfg)
   std::thread producer([&]
                        {
     for (size_t i = 0; i < offsets_us.size(); i++) {
-      Request r{static_cast<long long>(i), start + std::chrono::microseconds(offsets_us[i])};
+      auto arrival = start + std::chrono::microseconds(offsets_us[i]);
+      Request r{static_cast<long long>(i), arrival, arrival + std::chrono::milliseconds(cfg.slo_ms)};
       wait_until(r.arrival);
-      // M1 policy: accept everything. If the queue is full, block (the spin policy from Step 1).
-      while (!q.push(r)) {
+      if (q.size() >= cfg.queue_limit) {
         queue_full_hits++;
-        std::this_thread::yield();
+        if (cfg.policy == Policy::Reject) { rejected++; continue; }
+        // Queue / Expire: block until there is room (the spin policy from Step 1).
+        while (q.size() >= cfg.queue_limit) std::this_thread::yield();
       }
+      q.push(r);
     }
     done.store(true, std::memory_order_release); });
 
@@ -159,18 +185,25 @@ static int run_serve(const Config &cfg)
     std::vector<Request> batch;
     batch.reserve(cfg.max_batch);
     Request r;
+    // Under Expire, a request already past its deadline is dropped instead of wasting model time.
+    auto stale = [&](const Request &req) {
+      if (cfg.policy != Policy::Expire || Clock::now() < req.deadline) return false;
+      expired++;
+      return true;
+    };
     while (true) {
       if (!q.pop(r)) {
         if (!done.load(std::memory_order_acquire)) { std::this_thread::yield(); continue; }
         // Producer is done, but it may have pushed one last request after our failed pop.
         if (!q.pop(r)) break;
       }
+      if (stale(r)) continue;
       batch.clear();
       batch.push_back(r);
 
       auto fill_deadline = Clock::now() + std::chrono::microseconds(cfg.max_wait_us);
       while (batch.size() < cfg.max_batch) {
-        if (q.pop(r)) { batch.push_back(r); continue; }
+        if (q.pop(r)) { if (!stale(r)) batch.push_back(r); continue; }
         if (Clock::now() >= fill_deadline || done.load(std::memory_order_acquire)) break;
         std::this_thread::yield();
       }
@@ -182,8 +215,10 @@ static int run_serve(const Config &cfg)
       auto t1 = Clock::now();
       busy_us += to_us(t1 - t0);
       batches++;
-      for (const Request &b : batch)
+      for (const Request &b : batch) {
         latency_us.push_back(to_us(t1 - b.arrival));
+        if (t1 <= b.deadline) on_time++;
+      }
     } });
 
   producer.join();
@@ -197,6 +232,9 @@ static int run_serve(const Config &cfg)
   long long max = percentile(latency_us, 1.0);
   double offered_rps = trace_s > 0 ? offsets_us.size() / trace_s : 0.0;
   double capacity_rps = 1e6 / (cfg.fixed_us + cfg.per_item_us);
+  // Goodput: requests that finished within their SLO, per second of wall time.
+  double goodput_rps = elapsed_s > 0 ? on_time / elapsed_s : 0.0;
+  const char *policy_name = cfg.policy == Policy::Queue ? "queue" : cfg.policy == Policy::Reject ? "reject" : "expire";
 
   std::cout << "rate_scale=" << cfg.rate_scale << " requests=" << offsets_us.size()
             << " trace_s=" << trace_s << " elapsed_s=" << elapsed_s << "\n";
@@ -207,6 +245,9 @@ static int run_serve(const Config &cfg)
   std::cout << "completed=" << completed << " batches=" << batches
             << " mean_service_us=" << (batches ? busy_us / batches : 0) << "\n";
   std::cout << "latency_us p50=" << p50 << " p99=" << p99 << " max=" << max << "\n";
+  std::cout << "policy=" << policy_name << " slo_ms=" << cfg.slo_ms << " queue_limit=" << cfg.queue_limit
+            << " rejected=" << rejected << " expired=" << expired << "\n";
+  std::cout << "on_time=" << on_time << "/" << offsets_us.size() << " goodput_rps=" << goodput_rps << "\n";
   std::cout << "queue_full_hits=" << queue_full_hits << "\n";
 
   if (!cfg.metrics_out.empty())
@@ -218,6 +259,9 @@ static int run_serve(const Config &cfg)
       return 1;
     }
     mout << "{\n";
+    mout << "  \"policy\": \"" << policy_name << "\",\n";
+    mout << "  \"slo_ms\": " << cfg.slo_ms << ",\n";
+    mout << "  \"queue_limit\": " << cfg.queue_limit << ",\n";
     mout << "  \"rate_scale\": " << cfg.rate_scale << ",\n";
     mout << "  \"requests\": " << offsets_us.size() << ",\n";
     mout << "  \"fixed_us\": " << cfg.fixed_us << ",\n";
@@ -232,6 +276,10 @@ static int run_serve(const Config &cfg)
     mout << "  \"latency_p50_us\": " << p50 << ",\n";
     mout << "  \"latency_p99_us\": " << p99 << ",\n";
     mout << "  \"latency_max_us\": " << max << ",\n";
+    mout << "  \"rejected\": " << rejected << ",\n";
+    mout << "  \"expired\": " << expired << ",\n";
+    mout << "  \"on_time\": " << on_time << ",\n";
+    mout << "  \"goodput_rps\": " << goodput_rps << ",\n";
     mout << "  \"queue_full_hits\": " << queue_full_hits << "\n";
     mout << "}\n";
   }
@@ -243,6 +291,7 @@ static void usage(const char *prog)
   std::cerr << "Usage: " << prog
             << " --input <trace.jsonl> [--rate-scale X] [--max-events N]"
                " [--fixed-us N] [--per-item-us N] [--max-batch N] [--max-wait-us N]"
+               " [--slo-ms N] [--policy queue|reject|expire] [--queue-limit N]"
                " [--metrics-out <metrics.json>]\n";
 }
 
@@ -277,13 +326,32 @@ int main(int argc, char **argv)
       cfg.max_batch = std::stoul(next());
     else if (a == "--max-wait-us")
       cfg.max_wait_us = std::stoll(next());
+    else if (a == "--slo-ms")
+      cfg.slo_ms = std::stoll(next());
+    else if (a == "--queue-limit")
+      cfg.queue_limit = std::stoul(next());
+    else if (a == "--policy")
+    {
+      std::string p = next();
+      if (p == "queue")
+        cfg.policy = Policy::Queue;
+      else if (p == "reject")
+        cfg.policy = Policy::Reject;
+      else if (p == "expire")
+        cfg.policy = Policy::Expire;
+      else
+      {
+        usage(argv[0]);
+        return 2;
+      }
+    }
     else
     {
       usage(argv[0]);
       return 2;
     }
   }
-  if (cfg.input.empty() || cfg.rate_scale <= 0 || cfg.max_batch < 1)
+  if (cfg.input.empty() || cfg.rate_scale <= 0 || cfg.max_batch < 1 || cfg.queue_limit < 1 || cfg.queue_limit > 4095)
   {
     usage(argv[0]);
     return 2;
