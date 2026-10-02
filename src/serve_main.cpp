@@ -62,6 +62,8 @@ struct Config
   long long max_events = 0; // 0 = whole trace
   long long fixed_us = 2000;  // per-batch model cost
   long long per_item_us = 100; // extra cost per request in the batch
+  size_t max_batch = 1;         // 1 = no batching (M1 behaviour)
+  long long max_wait_us = 0;    // how long to hold a partial batch hoping it fills
 };
 
 // sleep_for overshoots by ~40% on macOS, which would skew every latency number.
@@ -150,9 +152,12 @@ static int run_serve(const Config &cfg)
     }
     done.store(true, std::memory_order_release); });
 
-  // Server: one request at a time, "running the model" for a fixed cost.
+  // Server: dynamic batching. Take the first waiting request, then keep taking more until the
+  // batch is full or max_wait_us has passed since the first one, then "run the model" once.
   std::thread server([&]
                      {
+    std::vector<Request> batch;
+    batch.reserve(cfg.max_batch);
     Request r;
     while (true) {
       if (!q.pop(r)) {
@@ -160,12 +165,25 @@ static int run_serve(const Config &cfg)
         // Producer is done, but it may have pushed one last request after our failed pop.
         if (!q.pop(r)) break;
       }
+      batch.clear();
+      batch.push_back(r);
+
+      auto fill_deadline = Clock::now() + std::chrono::microseconds(cfg.max_wait_us);
+      while (batch.size() < cfg.max_batch) {
+        if (q.pop(r)) { batch.push_back(r); continue; }
+        if (Clock::now() >= fill_deadline || done.load(std::memory_order_acquire)) break;
+        std::this_thread::yield();
+      }
+
+      // Big fixed cost + small per-item cost: the shape that makes batching pay off on GPUs.
       auto t0 = Clock::now();
-      wait_until(t0 + std::chrono::microseconds(cfg.fixed_us + cfg.per_item_us));
+      long long n = static_cast<long long>(batch.size());
+      wait_until(t0 + std::chrono::microseconds(cfg.fixed_us + cfg.per_item_us * n));
       auto t1 = Clock::now();
       busy_us += to_us(t1 - t0);
       batches++;
-      latency_us.push_back(to_us(t1 - r.arrival));
+      for (const Request &b : batch)
+        latency_us.push_back(to_us(t1 - b.arrival));
     } });
 
   producer.join();
@@ -183,6 +201,9 @@ static int run_serve(const Config &cfg)
   std::cout << "rate_scale=" << cfg.rate_scale << " requests=" << offsets_us.size()
             << " trace_s=" << trace_s << " elapsed_s=" << elapsed_s << "\n";
   std::cout << "offered_rps=" << offered_rps << " capacity_rps(batch=1)=" << capacity_rps << "\n";
+  double mean_batch = batches ? static_cast<double>(completed) / batches : 0.0;
+  std::cout << "max_batch=" << cfg.max_batch << " max_wait_us=" << cfg.max_wait_us
+            << " mean_batch=" << mean_batch << "\n";
   std::cout << "completed=" << completed << " batches=" << batches
             << " mean_service_us=" << (batches ? busy_us / batches : 0) << "\n";
   std::cout << "latency_us p50=" << p50 << " p99=" << p99 << " max=" << max << "\n";
@@ -203,7 +224,10 @@ static int run_serve(const Config &cfg)
     mout << "  \"per_item_us\": " << cfg.per_item_us << ",\n";
     mout << "  \"offered_rps\": " << offered_rps << ",\n";
     mout << "  \"completed\": " << completed << ",\n";
+    mout << "  \"max_batch\": " << cfg.max_batch << ",\n";
+    mout << "  \"max_wait_us\": " << cfg.max_wait_us << ",\n";
     mout << "  \"batches\": " << batches << ",\n";
+    mout << "  \"mean_batch\": " << mean_batch << ",\n";
     mout << "  \"elapsed_s\": " << elapsed_s << ",\n";
     mout << "  \"latency_p50_us\": " << p50 << ",\n";
     mout << "  \"latency_p99_us\": " << p99 << ",\n";
@@ -218,7 +242,8 @@ static void usage(const char *prog)
 {
   std::cerr << "Usage: " << prog
             << " --input <trace.jsonl> [--rate-scale X] [--max-events N]"
-               " [--fixed-us N] [--per-item-us N] [--metrics-out <metrics.json>]\n";
+               " [--fixed-us N] [--per-item-us N] [--max-batch N] [--max-wait-us N]"
+               " [--metrics-out <metrics.json>]\n";
 }
 
 int main(int argc, char **argv)
@@ -248,13 +273,17 @@ int main(int argc, char **argv)
       cfg.fixed_us = std::stoll(next());
     else if (a == "--per-item-us")
       cfg.per_item_us = std::stoll(next());
+    else if (a == "--max-batch")
+      cfg.max_batch = std::stoul(next());
+    else if (a == "--max-wait-us")
+      cfg.max_wait_us = std::stoll(next());
     else
     {
       usage(argv[0]);
       return 2;
     }
   }
-  if (cfg.input.empty() || cfg.rate_scale <= 0)
+  if (cfg.input.empty() || cfg.rate_scale <= 0 || cfg.max_batch < 1)
   {
     usage(argv[0]);
     return 2;

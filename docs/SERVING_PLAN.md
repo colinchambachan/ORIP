@@ -40,6 +40,6 @@ Each milestone is one commit, works on its own, and ends with a check you can ru
 
 - [x] M0 Close out Step 1 (tag `v1.0`). Finding: latency is set by queue capacity, and unpaced replay hides spin's real staleness (coordinated omission). M1 fixes that.
 - [x] M1 Paced arrivals. With 3000 requests, batch=1 (~476 req/s capacity): rate 0.25 → p50/p99 2.1/2.1 ms; rate 1 → 48/107 ms; rate 2 → 1.4 s/2.8 s (backlog grows without bound).
-- [ ] M2 Dynamic batching
+- [x] M2 Dynamic batching. At rate 1, max_batch 32 cuts p99 from 107 ms to 4.3 ms. Mean batch size grows with load (1.0 → 6.2 from rate 0.25 to 4). At light load, `--max-wait-us 5000` raises p99 from 2.1 ms to 7.2 ms, so waiting to fill a batch only pays off under load.
 - [ ] M3 Deadlines and shedding
 - [ ] M4 Experiment and write-up
